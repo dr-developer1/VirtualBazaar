@@ -1,0 +1,6 @@
+﻿services:
+  virtualbazaar:
+    image: virtualbazaar
+    build:
+      context: .
+      dockerfile: VirtualBazaar/Dockerfile
