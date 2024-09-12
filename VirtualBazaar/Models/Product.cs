@@ -10,7 +10,7 @@ public class Product
 
     [Required]
     [StringLength(100, MinimumLength = 3)]
-    public string Name { get; set; }
+    public required string Name { get; set; }
 
     [Required]
     [Range(0.01, 10000.00)]
