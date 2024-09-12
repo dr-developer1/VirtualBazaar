@@ -20,7 +20,10 @@ public class Product
     [FutureDate(ErrorMessage = "Release date must be in the future")]
     public DateTime ReleaseDate { get; set; }
 
+    [Display(Name = "Category")]
     public int CategoryId { get; set; }
+
+    [ForeignKey("CategoryId")]
     public Category Category { get; set; }
 
     [Display(Name = "Product Image")]
