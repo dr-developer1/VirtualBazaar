@@ -15,7 +15,7 @@
 
     <ItemGroup>
       <Folder Include="TagHelpers\" />
-      <Folder Include="Views\" />
+      <Folder Include="Views\Home\" />
     </ItemGroup>
 
     <ItemGroup>
