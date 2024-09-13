@@ -20,4 +20,11 @@ RUN dotnet publish "VirtualBazaar.csproj" -c $BUILD_CONFIGURATION -o /app/publis
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+
+USER root
+RUN mkdir -p /app/wwwroot/images && chmod 777 /app/wwwroot/images
+
+# Switch back to the non-root user
+USER $APP_UID
+
 ENTRYPOINT ["dotnet", "VirtualBazaar.dll"]

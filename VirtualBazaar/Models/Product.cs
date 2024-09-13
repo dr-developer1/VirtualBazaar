@@ -1,6 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-using VirtualBazaar.Validation;
 
 namespace VirtualBazaar.Models;
 
@@ -11,25 +9,13 @@ public class Product
     [Required]
     [StringLength(100, MinimumLength = 3)]
     public required string Name { get; set; }
+    
+    public DateTime CreatedDate { get; set; } = DateTime.Now;
+    [Required] [Range(0.01, 10000.00)] 
+    public float Price { get; set; }
 
-    [Required]
-    [Range(0.01, 10000.00)]
-    public decimal Price { get; set; }
+    [EnumDataType(typeof(Category))] 
+    public Category Category { get; set; } = Category.Electronics;
 
-    [DataType(DataType.Date)]
-    [FutureDate(ErrorMessage = "Release date must be in the future")]
-    public DateTime ReleaseDate { get; set; }
-
-    [Display(Name = "Category")]
-    public int CategoryId { get; set; }
-
-    [ForeignKey("CategoryId")]
-    public Category Category { get; set; }
-
-    [Display(Name = "Product Image")]
-    public string ImagePath { get; set; }
-
-    [NotMapped]
-    [Display(Name = "Upload Image")]
-    public IFormFile ImageFile { get; set; }
+    public string ImageUrl { get; set; }
 }

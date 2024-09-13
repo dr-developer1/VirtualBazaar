@@ -1,124 +1,108 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using VirtualBazaar.Data;
 using VirtualBazaar.Models;
+using VirtualBazaar.ViewModels;
 
 namespace VirtualBazaar.Controllers;
 
-public class ProductController(ApplicationDbContext context, ILogger<ProductController> logger)
+[Route("[controller]/[action]")]
+public class ProductController(ILogger<ProductController> logger)
     : Controller
 {
-    private const int PageSize = 10;
+    private static readonly List<Product> Products = [];
 
-    public async Task<IActionResult> Index(string searchString, int? pageIndex)
+    public IActionResult Index(string searchString, Category? category)
     {
         logger.LogInformation("Retrieving all products");
-        var products = from p in context.Products
-            select p;
+
+        var filteredItems = Products;
 
         if (!string.IsNullOrEmpty(searchString))
         {
-            products = products.Where(s => s.Name.Contains(searchString));
+            filteredItems = filteredItems.Where(i => i.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+                .ToList();
         }
 
-        var pageNumber = (pageIndex ?? 1);
-        var pagedProducts = await PaginatedList<Product>.CreateAsync(products.AsNoTracking(), pageNumber, PageSize);
-
-        ViewData["CurrentFilter"] = searchString;
-        return View(pagedProducts);
-    }
-    
-    public async Task<IActionResult> Details(int? id)
-    {
-        if (id == null)
+        if (category.HasValue)
         {
-            return NotFound();
+            filteredItems = filteredItems.Where(i => i.Category == category.Value).ToList();
         }
 
-        var product = await context.Products
-            .FirstOrDefaultAsync(m => m.Id == id);
-        if (product == null)
-        {
-            return NotFound();
-        }
-
-        return View(product);
+        var viewModel = new ProductViewModel
+            { Products = filteredItems, SearchString = searchString, SelectedCategory = category };
+        return View(viewModel);
     }
-    
+
     public IActionResult Create()
     {
         return View();
     }
-    
+
     [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create([Bind("Name,Price,CreatedDate,CategoryId")] Product product)
+    public IActionResult Create(Product product, IFormFile image)
     {
-        if (ModelState.IsValid)
+        logger.LogInformation("Creating a new product");
+        if (image is { Length: > 0 })
         {
-            context.Add(product);
-            await context.SaveChangesAsync();
-            logger.LogInformation("Created new product: {ProductName}", product.Name);
-            return RedirectToAction(nameof(Index));
-        }
-        logger.LogWarning("Failed to create product due to invalid model state");
-        return View(product);
-    }
-    
-    public async Task<IActionResult> Edit(int? id)
-    {
-        if (id == null)
-        {
-            return NotFound();
-        }
+            var fileName = Path.GetFileName(image.FileName);
+            var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", fileName);
 
-        var product = await context.Products.FindAsync(id);
-        if (product == null)
-        {
-            return NotFound();
-        }
-
-        return View(product);
-    }
-    
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int id, [Bind("Id,Name,Price,CreatedDate,CategoryId")] Product product)
-    {
-        if (id != product.Id)
-        {
-            return NotFound();
-        }
-
-        if (!ModelState.IsValid) return View(product);
-        try
-        {
-            context.Update(product);
-            await context.SaveChangesAsync();
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            if (!ProductExists(product.Id))
+            using (var stream = new FileStream(filePath, FileMode.Create))
             {
-                return NotFound();
+                image.CopyTo(stream);
             }
 
-            throw;
+            product.ImageUrl = "/images/" + fileName;
         }
 
-        return RedirectToAction(nameof(Index));
-
+        product.Id = Products.Count + 1;
+        product.CreatedDate = DateTime.Now;
+        Products.Add(product);
+        return RedirectToAction("Index");
     }
-    
-    public async Task<IActionResult> Delete(int? id)
+
+    public IActionResult Edit(int? id)
     {
         if (id == null)
         {
             return NotFound();
         }
 
-        var product = await context.Products
-            .FirstOrDefaultAsync(m => m.Id == id);
+        var product = Products.FirstOrDefault(i => i.Id == id);
+
+        return View(product);
+    }
+
+    [HttpPost]
+    public IActionResult Edit(Product product, IFormFile image)
+    {
+        var existingItem = Products.FirstOrDefault(i => i.Id == product.Id);
+        if (existingItem == null) return RedirectToAction("Index");
+        existingItem.Name = product.Name;
+        existingItem.Price = product.Price;
+        existingItem.Category = product.Category;
+
+        if (image is not { Length: > 0 }) return RedirectToAction("Index");
+        var fileName = Path.GetFileName(image.FileName);
+        var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", fileName);
+
+        using (var stream = new FileStream(filePath, FileMode.Create))
+        {
+            image.CopyTo(stream);
+        }
+
+        existingItem.ImageUrl = "/images/" + fileName;
+        return RedirectToAction("Index");
+    }
+
+    public IActionResult Delete(int? id)
+    {
+        if (id == null)
+        {
+            return NotFound();
+        }
+
+        var product = Products
+            .FirstOrDefault(m => m.Id == id);
         if (product == null)
         {
             return NotFound();
@@ -126,42 +110,14 @@ public class ProductController(ApplicationDbContext context, ILogger<ProductCont
 
         return View(product);
     }
-    
-    [HttpPost, ActionName("Delete")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteConfirmed(int id)
+
+    [HttpPost]
+    public IActionResult DeleteConfirmed(int id)
     {
-        var product = await context.Products.FindAsync(id);
-        context.Products.Remove(product);
-        await context.SaveChangesAsync();
-        return RedirectToAction(nameof(Index));
-    }
-
-    private bool ProductExists(int id)
-    {
-        return context.Products.Any(e => e.Id == id);
-    }
-}
-
-public class PaginatedList<T> : List<T>
-{
-    private int PageIndex { get; set; }
-    private int TotalPages { get; set; }
-
-    private PaginatedList(List<T> items, int count, int pageIndex, int pageSize)
-    {
-        PageIndex = pageIndex;
-        TotalPages = (int)Math.Ceiling(count / (double)pageSize);
-        AddRange(items);
-    }
-
-    public bool HasPreviousPage => PageIndex > 1;
-    public bool HasNextPage => PageIndex < TotalPages;
-
-    public static async Task<PaginatedList<T>> CreateAsync(IQueryable<T> source, int pageIndex, int pageSize)
-    {
-        var count = await source.CountAsync();
-        var items = await source.Skip((pageIndex - 1) * pageSize).Take(pageSize).ToListAsync();
-        return new PaginatedList<T>(items, count, pageIndex, pageSize);
+        logger.LogInformation("Deleting a product" + id);
+        var product = Products.FirstOrDefault(p => p.Id == id);
+        if (product == null) return NotFound();
+        Products.Remove(product);
+        return RedirectToAction("Index");
     }
 }

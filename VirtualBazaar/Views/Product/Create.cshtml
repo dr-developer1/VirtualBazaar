@@ -1,0 +1,29 @@
+@using Microsoft.AspNetCore.Mvc.TagHelpers
+@using VirtualBazaar.Models
+@model VirtualBazaar.Models.Product
+
+@{
+    ViewData["Title"] = "Create Product";
+}
+
+<h1>Create Product</h1>
+
+<form asp-action="Create" method="post" enctype="multipart/form-data">
+    <label>Name:</label>
+    <input asp-for="Name" />
+
+    <label>Price:</label>
+    <input type="number" asp-for="Price"></input>
+
+    <label>Category:</label>
+    <select asp-for="Category" asp-items="Html.GetEnumSelectList<Category>()"></select>
+
+    <label>Image:</label>
+    <input type="file" name="image" accept="image/*" />
+
+    <button type="submit">Create</button>
+</form>
+
+<div>
+    <a asp-action="Index">Back to List</a>
+</div>
